@@ -93,7 +93,6 @@ class Project(Base):
 class Response(Base):
     __tablename__ = "response"
     id: Mapped[int] = mapped_column(primary_key=True)
-    # TODO is it a good idea to use "respondent" instead of user? 
     respondent_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
     note: Mapped[str] = mapped_column(String(200), nullable=True)
@@ -103,7 +102,7 @@ class Response(Base):
     project: Mapped["Project"] = relationship(back_populates="responses")
 
     def __repr__(self) -> str:
-        return f"Resume(id={self.id!r}, user_id={self.user_id!r}, resume_text={self.resume_text!r})"
+        return f"Response(id={self.id!r}, respondent_id={self.respondent_id!r}, note={self.note!r})"
 
 
 # class SkillTag(Base):
