@@ -1,5 +1,6 @@
 # Added by Arseny:
 first_try
+*.db
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
