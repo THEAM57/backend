@@ -1,4 +1,3 @@
-from typing import Annotated
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -7,7 +6,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from db.database import get_db
 from schemas import *
-from db.models import User, Project, Resume
+from db.models import User, Project
 from auth import hash_password, get_current_user
 
 router = APIRouter()
@@ -40,8 +39,8 @@ def fetch_users(
     # Получение пользователей с пагинацией
     db_users = db.query(User).offset(offset).limit(limit).all()
     
-    # Преобразование в схему UserResponse
-    users = [UserResponse.model_validate(user) for user in db_users]
+    # Преобразование в схему UserListItem
+    users = [UserListItem.model_validate(user) for user in db_users]
     
     # Вычисление общего количества страниц
     total_pages = math.ceil(total / limit) if total > 0 else 0

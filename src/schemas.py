@@ -46,7 +46,19 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class UserListResponse(PaginatedResponse[UserResponse]):
+class UserListItem(BaseModel):
+    id: int
+    email: EmailStr
+    first_name: str
+    middle_name: str
+    last_name: str | None = None
+    isu_number: int | None = None
+    tg_nickname: str | None = None
+
+    class Config:
+        from_attributes = True
+
+class UserListResponse(PaginatedResponse[UserListItem]):
     pass
 
 # Project schemes, TODO move to a separate file in the future
