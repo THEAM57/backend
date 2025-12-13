@@ -1,13 +1,18 @@
-from typing import List, Optional
-from sqlalchemy import ForeignKey, String, Table, Column
-from sqlalchemy.orm import Mapped, mapped_column, relationship # DeclarativeBase,
-from sqlalchemy.orm import declarative_base
+from __future__ import annotations
 
-Base = declarative_base()
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database import Base
+
 
 class User(Base):
     __tablename__ = "user"
-    id: Mapped[int] = mapped_column(primary_key=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
     first_name: Mapped[str] = mapped_column(String(30), nullable=False)
     middle_name: Mapped[str] = mapped_column(String(40), nullable=False)
     last_name: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -18,18 +23,25 @@ class User(Base):
 
     password_hashed: Mapped[str] = mapped_column(String, nullable=False)
 
-    resumes: Mapped[list["Resume"]] = relationship(
-            back_populates="user", cascade="all, delete-orphan" 
+    resumes: Mapped[list[Resume]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
-    responses: Mapped[list["Response"]] = relationship(
-        back_populates="respondent", cascade="all, delete-orphan" 
+    responses: Mapped[list[Response]] = relationship(
+        back_populates="respondent",
+        cascade="all, delete-orphan",
     )
-    projects_led: Mapped[list["Project"]] = relationship(
+    projects_led: Mapped[list[Project]] = relationship(
         # The project will not be deleted when its author gets deleted
-        back_populates="author"
+        back_populates="author",
     )
-    projects_in: Mapped[list['ProjectParticipation']] = relationship(
-        back_populates='participant', cascade='all, delete-orphan'
+    projects_in: Mapped[list[ProjectParticipation]] = relationship(
+        back_populates="participant",
+        cascade="all, delete-orphan",
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     def __repr__(self) -> str:
@@ -38,69 +50,84 @@ class User(Base):
 
 class Resume(Base):
     __tablename__ = "resume"
-    id: Mapped[int] = mapped_column(primary_key=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     author_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     header: Mapped[str] = mapped_column(nullable=False)
     resume_text: Mapped[str | None] = mapped_column(nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="resumes")
+    user: Mapped[User] = relationship(back_populates="resumes")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     # skills (particular, like docker, git etc.)
     # roles (general, like backend, Project Management etc.)
 
     def __repr__(self) -> str:
-        return (
-            f"Resume(id={self.id!r}, "
-            f"author_id={self.author_id!r}, "
-            f"header={self.header!r})"
-        )
+        return f"Resume(id={self.id!r}, author_id={self.author_id!r}, header={self.header!r})"
 
 
 class Project(Base):
     __tablename__ = "project"
-    id: Mapped[int] = mapped_column(primary_key=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     author_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     description: Mapped[str | None] = mapped_column(nullable=True)
     max_participants: Mapped[str | None] = mapped_column(nullable=True)
 
-    author: Mapped["User"] = relationship(back_populates="projects_led")
-    responses: Mapped[list["Response"]] = relationship(
+    author: Mapped[User] = relationship(back_populates="projects_led")
+    responses: Mapped[list[Response]] = relationship(
         # TODO do we want to store responses to a deleted project?
-        back_populates="project", cascade="all, delete-orphan"
+        back_populates="project",
+        cascade="all, delete-orphan",
     )
 
     # status_id (for later, need to create the Status table first)
     # skills (particular, like docker, git etc.)
     # roles (general, like backend, Project Management etc.)
-    participants: Mapped[list['ProjectParticipation']] = relationship(back_populates='project')
+    participants: Mapped[list[ProjectParticipation]] = relationship(back_populates="project")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     def __repr__(self) -> str:
         return f"Project(id={self.id!r}, author_id={self.author_id!r}, description={self.description!r})"
 
 
 class ProjectParticipation(Base):
-    __tablename__ = 'project_participation'
-    id: Mapped[int] = mapped_column(primary_key=True)
+    __tablename__ = "project_participation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
     participant_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
 
-    project: Mapped['Project'] = relationship(back_populates='participants')
-    participant: Mapped['User'] = relationship(back_populates='projects_in')
+    project: Mapped[Project] = relationship(back_populates="participants")
+    participant: Mapped[User] = relationship(back_populates="projects_in")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class Response(Base):
     __tablename__ = "response"
-    id: Mapped[int] = mapped_column(primary_key=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     respondent_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
     note: Mapped[str] = mapped_column(String(200), nullable=True)
 
     # TODO not all relationships are needed. Remove unneeded
-    respondent: Mapped["User"] = relationship(back_populates="responses")
-    project: Mapped["Project"] = relationship(back_populates="responses")
+    respondent: Mapped[User] = relationship(back_populates="responses")
+    project: Mapped[Project] = relationship(back_populates="responses")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     def __repr__(self) -> str:
         return f"Response(id={self.id!r}, respondent_id={self.respondent_id!r}, note={self.note!r})"
-
-

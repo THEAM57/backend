@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Database
-    # DATABASE_URL: str = "postgresql://postgres:password@127.0.0.1/backend_db" TODO learn postgresql
-    DATABASE_URL: str = "sqlite:///test.db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost/backend_db"
+    DEBUG: bool = False
+
+    # Environment
+    ENVIRONMENT: str = "development"
 
     # JWT
     SECRET_KEY: str = "your-secret-key-here"
@@ -15,15 +20,21 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list = [
         "http://localhost:8000",
         "http://localhost:5173",
-        "http://backend:8000", 
+        "http://backend:8000",
         "http://localhost",
-        "http://localhost:8083", 
+        "http://localhost:8083",
         "http://frontend:80",
         "fpin-projects.ru",
         "http://fpin-projects.ru:1268/",
-        "http://fpin-projects.ru:12683/"
+        "http://fpin-projects.ru:12683/",
     ]
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_FILE: str = "app.log"
+    ENABLE_FILE_LOGGING: bool = True
+    ENABLE_CONSOLE_LOGGING: bool = True
 
     class Config:
         env_file = "../.env"

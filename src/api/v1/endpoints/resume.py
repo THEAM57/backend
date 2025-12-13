@@ -1,146 +1,95 @@
-import math
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from core.database import get_db
-from core.dependencies import get_current_user
-from schemas import *
-from model.models import User, Resume
-
+from src.core.container import get_resume_service
+from src.core.dependencies import get_current_user
+from src.model.models import User
+from src.schema.resume import ResumeCreate, ResumeFull, ResumeListResponse, ResumeUpdate
+from src.services.resume_service import ResumeService
 
 resume_router = APIRouter(prefix="/resumes", tags=["resume"])
 
+
 @resume_router.get("/{resume_id}", response_model=ResumeFull)
-def fetch_resume(
-        resume_id: int,
-        db: Session = Depends(get_db),
-        _: User = Depends(get_current_user),
+async def fetch_resume(
+    resume_id: int,
+    resume_service: ResumeService = Depends(get_resume_service),
+    _current_user: User = Depends(get_current_user),
 ):
-    db_resume = db.query(Resume).filter(Resume.id == resume_id).first()
-    if not db_resume:
-        raise HTTPException(status_code=404, detail="There is no resume with that id!")
-    return db_resume
-
-
-@resume_router.post("/resumes", response_model=ResumeResponse, status_code=201, tags=["resume"])
-def create_resume(
-        resume: ResumeCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-):
-    data = resume.model_dump(exclude_unset=True)
-    if "author_id" not in data:
-        data["author_id"] = current_user.id
-
-    print(data)
-    db_resume = Resume(**data)
-    print(db_resume)
-    db.add(db_resume)
-
-    try:
-        db.commit()
-        db.refresh(db_resume)
-    except SQLAlchemyError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create the resume",
-        )
-
-    return db_resume
-
-
-@resume_router.patch("/{resume_id}", response_model=ResumeFull, tags=["resume"])
-def update_resume(
-        resume_id: int,
-        resume: ResumeUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-):
-    db_resume = db.query(Resume).filter(Resume.id == resume_id).first()
-    if not db_resume:
+    """Получить резюме по ID"""
+    resume = await resume_service.get_resume_by_id(resume_id)
+    if not resume:
         raise HTTPException(status_code=404, detail="There is no resume with that id!")
 
-    if current_user.id != db_resume.author_id:
-        # TODO add admin role check in the future
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Only a user with id {db_resume.user_id} can update this resume!",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    update_data = resume.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_resume, field, value)
-
-    try:
-        db.commit()
-        db.refresh(db_resume)
-    except SQLAlchemyError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update the resume",
-        )
-
-    return db_resume
+    return ResumeFull.model_validate(resume)
 
 
-@resume_router.delete("/{resume_id}", response_model=DeleteResponse, tags=["resume"])
-def delete_resume(
-        resume_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+@resume_router.get("/", response_model=ResumeListResponse)
+async def fetch_resumes(
+    page: int = Query(1, ge=1, description="Номер страницы"),
+    limit: int = Query(10, ge=1, le=100, description="Количество резюме на странице"),
+    resume_service: ResumeService = Depends(get_resume_service),
+    _current_user: User = Depends(get_current_user),
 ):
-    db_resume = db.query(Resume).filter(Resume.id == resume_id).first()
-    if not db_resume:
-        raise HTTPException(
-            status_code=404,
-            detail="There is no resume with that id!",
-        )
+    """Получить список резюме с пагинацией"""
+    resumes, total = await resume_service.get_resumes_paginated(page, limit)
+    resumes_list = [ResumeFull.model_validate(resume) for resume in resumes]
 
-    if current_user.id != db_resume.author_id:
-        # TODO add admin role check in the future
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Only a user with id {db_resume.user_id} can delete this resume!",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    try:
-        db.delete(db_resume)
-        db.commit()
-    except SQLAlchemyError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete the resume",
-        )
-
-    return {"message": "Resume Deleted"}
-
-
-@resume_router.get("/resumes", response_model=ResumeListResponse, tags=['resume'])
-def fetch_resumes(
-        page: int = Query(1, ge=1, description="Номер страницы"),
-        limit: int = Query(10, ge=1, le=100, description="Количество резюме на странице"),
-        db: Session = Depends(get_db),
-        _: User = Depends(get_current_user)
-):
-    total = db.query(Resume).count()
-    offset = (page - 1) * limit
-
-    db_resumes = db.query(Resume).offset(offset).limit(limit).all()
-    resumes = [ResumeFull.model_validate(resume) for resume in db_resumes]
-
-    total_pages = math.ceil(total / limit) if total > 0 else 0
+    total_pages = (total + limit - 1) // limit if total > 0 else 0
 
     return ResumeListResponse(
-        items=resumes,
+        items=resumes_list,
         total=total,
         page=page,
         limit=limit,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
+
+
+@resume_router.post("/", response_model=ResumeFull)
+async def create_resume(
+    resume_data: ResumeCreate,
+    resume_service: ResumeService = Depends(get_resume_service),
+    current_user: User = Depends(get_current_user),
+):
+    """Создать новое резюме"""
+    resume = await resume_service.create_resume(resume_data, current_user.id)
+    return ResumeFull.model_validate(resume)
+
+
+@resume_router.put("/{resume_id}", response_model=ResumeFull)
+async def update_resume(
+    resume_id: int,
+    resume_data: ResumeUpdate,
+    resume_service: ResumeService = Depends(get_resume_service),
+    current_user: User = Depends(get_current_user),
+):
+    """Обновить резюме (только автор может обновлять)"""
+    try:
+        resume = await resume_service.update_resume(resume_id, resume_data, current_user.id)
+        if not resume:
+            raise HTTPException(status_code=404, detail="Resume not found")
+
+        return ResumeFull.model_validate(resume)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to update resume: {e!s}") from e
+
+
+@resume_router.delete("/{resume_id}")
+async def delete_resume(
+    resume_id: int,
+    resume_service: ResumeService = Depends(get_resume_service),
+    current_user: User = Depends(get_current_user),
+):
+    """Удалить резюме (только автор может удалять)"""
+    try:
+        success = await resume_service.delete_resume(resume_id, current_user.id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Resume not found")
+
+        return {"message": "Resume deleted successfully"}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))

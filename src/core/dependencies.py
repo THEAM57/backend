@@ -1,39 +1,60 @@
-import jwt
-# from dependency_injector.wiring import Provide, inject
-from sqlalchemy.orm import Session
-from fastapi import Depends, HTTPException, status
+from __future__ import annotations
 
-from core.config import settings
-from core.database import get_db
-from core.security import oauth2_scheme
-from model.models import User
+from typing import TYPE_CHECKING
+
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+
+from core.container import get_auth_service
+from src.core.logging_config import get_logger
+
+# OAuth2PasswordBearer импорт заменен для корректной работы с логированием
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+if TYPE_CHECKING:
+    from src.model.models import User
+    from src.services.auth_service import AuthService
 
 
-
-# @inject
-def get_current_user(
+async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    """Получить текущего пользователя с использованием AuthService (асинхронно)"""
+    logger = get_logger(__name__)
+
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email: str = payload.get('sub')
-        if not email:
-            print("NO EMAIL")
-            raise credentials_exception
+        user = await auth_service.get_current_user(token)
+        logger.debug(f"Successfully retrieved current user: {user.email} (ID: {user.id})")
+        return user
+    except HTTPException as e:
+        logger.warning(f"Failed to get current user - Status: {e.status_code}, Detail: {e.detail}")
+        raise
 
-    except jwt.PyJWTError:
-        print("JWT EXCEPT")
-        raise credentials_exception
 
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        print("NO USER")
-        raise credentials_exception
+async def get_current_user_no_exception(
+    token: str = Depends(oauth2_scheme),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> User | None:
+    """Получить текущего пользователя без исключения (возвращает None если ошибка)"""
+    logger = get_logger(__name__)
 
-    return user
+    try:
+        user = await auth_service.get_current_user(token)
+        logger.debug(f"Successfully retrieved current user (no exception): {user.email} (ID: {user.id})")
+        return user
+    except HTTPException as e:
+        logger.debug(f"Failed to get current user (no exception) - Status: {e.status_code}")
+        return None
+
+
+async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Получить текущего активного пользователя (для будущего использования)"""
+    # В будущем здесь можно добавить проверку активности пользователя
+    return current_user
+
+
+async def get_current_super_user(current_user: User = Depends(get_current_user)) -> User:
+    """Получить текущего супер-пользователя (для будущего использования)"""
+    # В будущем здесь можно добавить проверку ролей
+    return current_user

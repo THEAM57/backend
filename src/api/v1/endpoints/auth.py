@@ -1,54 +1,83 @@
-from datetime import timedelta
+from __future__ import annotations
 
 from typing import Annotated
-from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import  OAuth2PasswordRequestForm
 
-from core.config import settings
-from core.database import get_db
-from core.security import create_access_token, verify_password
-from model.models import User
-from schemas import Token
+from fastapi import APIRouter, Depends, Request
+from fastapi.security import OAuth2PasswordRequestForm
+
+from src.core.container import get_auth_service
+from src.core.dependencies import get_current_user
+from src.core.logging_config import api_logger
+from src.schema.auth import Token
+from src.services.auth_service import AuthService
 
 auth_router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
-def authenticate_user(
-    email: str,
-    password: str,
-    db: Session
-):
-    db_user = db.query(User).filter(User.email == email).first()
-    if not db_user or not verify_password(password, db_user.password_hashed):
-        return False
-
-    return db_user
-
-
-@auth_router.post("/token")
+@auth_router.post("/token", response_model=Token)
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Session = Depends(get_db)
-):
-    # OAuth2PasswordRequestForm has strict fields names, but we will treat username as an email
-    user = authenticate_user(form_data.username, form_data.password, db)
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> Token:
+    """Вход в систему и получение токена доступа"""
+    # Логируем начало запроса
+    client_ip = request.client.host if request.client else "unknown"
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        result = await auth_service.login_for_access_token(form_data, request)
+        # Логируем успешный запрос
+        api_logger.log_request(
+            method="POST",
+            path="/auth/token",
+            user_id=None,  # Пользователь еще не аутентифицирован
+            ip_address=client_ip,
+            status_code=200,
+            response_time=0.0,  # Можно добавить измерение времени
         )
+        return result
+    except Exception as e:
+        # Логируем ошибку
+        api_logger.log_error(method="POST", path="/auth/token", error=e, user_id=None)
+        raise
 
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+
+@auth_router.post("/logout")
+async def logout(
+    request: Request,
+    _current_user: Annotated[str, Depends(get_current_user)],
+):
+    """Выход из системы (простое удаление токена на клиенте)"""
+    client_ip = request.client.host if request.client else "unknown"
+
+    api_logger.log_request(
+        method="POST",
+        path="/auth/logout",
+        user_id=None,  # Пользователь еще не определен из _current_user
+        ip_address=client_ip,
+        status_code=200,
+        response_time=0.0,
     )
-    return Token(access_token=access_token, token_type="bearer")
+
+    return {"message": "Successfully logged out"}
 
 
+@auth_router.get("/me")
+async def get_current_user_info(
+    request: Request,
+    current_user: Annotated[str, Depends(get_current_user)],
+):
+    """Получить информацию о текущем пользователе"""
+    client_ip = request.client.host if request.client else "unknown"
 
+    api_logger.log_request(
+        method="GET", path="/auth/me", user_id=current_user.id, ip_address=client_ip, status_code=200, response_time=0.0
+    )
 
-
-
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "middle_name": current_user.middle_name,
+        "last_name": current_user.last_name,
+    }
