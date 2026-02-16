@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -54,7 +54,7 @@ class Blank(BaseModel):
 
 
 # Общие схемы из schemas.py
-class PaginatedResponse[T](BaseModel):
+class PaginatedResponse(BaseModel, Generic[T]):
     """Общая схема пагинированного ответа"""
 
     items: list[T]

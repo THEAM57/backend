@@ -133,6 +133,32 @@ class Response(Base):
         return f"Response(id={self.id!r}, respondent_id={self.respondent_id!r}, note={self.note!r})"
 
 
+class Evaluation(Base):
+    __tablename__ = "evaluation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+    evaluator_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    participant_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+
+    # Оценки по критериям в формате {"criterion_key": score}
+    scores: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Итоговая сумма баллов по всем критериям
+    total_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    comment: Mapped[str | None] = mapped_column(nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"Evaluation(id={self.id!r}, project_id={self.project_id!r}, "
+            f"participant_id={self.participant_id!r}, total_score={self.total_score!r})"
+        )
+
+
 class Session(Base):
     __tablename__ = "session"
 
