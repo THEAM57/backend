@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import Sequence, desc, select
 
-from core.uow import IUnitOfWork
+from src.core.logging_config import get_logger
+from src.core.uow import IUnitOfWork
 from src.model.models import AuditLog
 
 
@@ -11,6 +12,7 @@ class AuditRepository:
 
     def __init__(self, uow: IUnitOfWork) -> None:
         self.uow = uow
+        self._logger = get_logger(self.__class__.__name__)
 
         # в будущем можно будет добавить больше фильтров
 

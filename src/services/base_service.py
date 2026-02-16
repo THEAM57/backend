@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from src.core.exceptions import NotFoundError
 from src.repository.base_repository import RepositoryProtocol
@@ -10,7 +10,7 @@ CreateSchemaType = TypeVar("CreateSchemaType")
 UpdateSchemaType = TypeVar("UpdateSchemaType")
 
 
-class BaseService[ModelType, CreateSchemaType, UpdateSchemaType]:
+class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """Улучшенный базовый сервис с дополнительными возможностями (асинхронный)"""
 
     def __init__(self, repository: RepositoryProtocol) -> None:
