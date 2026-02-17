@@ -53,7 +53,6 @@ async def get_audit_repository(uow: IUnitOfWork = Depends(get_uow)) -> AuditRepo
     return AuditRepository(uow)
 
 
-feature/amish
 async def get_evaluation_repository(uow: IUnitOfWork = Depends(get_uow)) -> EvaluationRepository:
     return EvaluationRepository(uow)
 
@@ -71,7 +70,6 @@ async def get_defense_slot_repository(uow: IUnitOfWork = Depends(get_uow)) -> De
 
 async def get_defense_registration_repository(uow: IUnitOfWork = Depends(get_uow)) -> DefenseRegistrationRepository:
     return DefenseRegistrationRepository(uow)
- main
 
 
 # Service
@@ -111,8 +109,6 @@ async def get_audit_service(
     return AuditService(audit_repository)
 
 
-
-  feature/amish
 async def get_evaluation_service(
     evaluation_repository: EvaluationRepository = Depends(get_evaluation_repository),
     project_repository: ProjectRepository = Depends(get_project_repository),
@@ -126,4 +122,3 @@ async def get_defense_service(
     registration_repository: DefenseRegistrationRepository = Depends(get_defense_registration_repository),
 ) -> DefenseService:
     return DefenseService(project_type_repository, day_repository, slot_repository, registration_repository)
- main

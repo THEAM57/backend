@@ -12,11 +12,17 @@ from src.api.v1.endpoints.user import user_router
 from src.api.v1.endpoints.defense import defense_router
 
 routers = APIRouter(prefix="/v1")
-feature/amish
-router_list = [auth_router, user_router, resume_router, project_router, sessions_router, audit_router, evaluation_router]
 
-router_list = [auth_router, user_router, resume_router, project_router, sessions_router, audit_router, defense_router]
-main
+router_list = [
+    auth_router,
+    user_router,
+    resume_router,
+    project_router,
+    sessions_router,
+    audit_router,
+    evaluation_router,
+    defense_router,
+]
 
 for router in router_list:
     routers.tags.append("v1")

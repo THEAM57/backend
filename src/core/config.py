@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ENABLE_FILE_LOGGING: bool = True
     ENABLE_CONSOLE_LOGGING: bool = True
 
-    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
