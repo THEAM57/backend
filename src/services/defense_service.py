@@ -178,3 +178,19 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
 
         return await self._registration_repository.create(slot_id=slot_id, user_id=user_id)
 
+    async def get_my_registrations(self, user_id: int) -> list[DefenseRegistration]:
+        """Получить список записей пользователя на защиты (слоты с датой и типом проекта), по времени."""
+        return await self._registration_repository.list_by_user(user_id=user_id)
+
+    async def unregister_user_from_slot(self, user_id: int, slot_id: int) -> None:
+        """Снять пользователя с записи на защиту в указанном слоте.
+
+        Raises:
+            ValueError: если запись не найдена (пользователь не был записан на этот слот).
+        """
+        deleted = await self._registration_repository.delete_by_user_and_slot(
+            user_id=user_id, slot_id=slot_id
+        )
+        if not deleted:
+            raise ValueError("Registration not found")
+

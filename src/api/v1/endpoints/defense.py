@@ -18,8 +18,11 @@ from src.schema.defense import (
     DefenseSlotFull,
     DefenseSlotListItem,
     DefenseSlotListResponse,
+    MyDefenseItem,
+    MyDefenseListResponse,
     ProjectTypeCreate,
     ProjectTypeFull,
+    ProjectTypeInfo,
     ProjectTypeListResponse,
     ScheduledDefenseItem,
     ScheduledDefenseListResponse,
@@ -197,6 +200,34 @@ async def create_defense_slot(
     return DefenseSlotFull.model_validate(slot)
 
 
+@defense_router.get("/my-registrations", response_model=MyDefenseListResponse)
+async def list_my_defenses(
+    defense_service: DefenseService = Depends(get_defense_service),
+    current_user: User = Depends(get_current_user),
+) -> MyDefenseListResponse:
+    """Получить список защит, на которые записан текущий пользователь."""
+    registrations = await defense_service.get_my_registrations(user_id=current_user.id)
+    items = []
+    for reg in registrations:
+        slot = reg.slot
+        day = slot.defense_day
+        items.append(
+            MyDefenseItem(
+                registration_id=reg.id,
+                slot_id=slot.id,
+                defense_day_id=slot.defense_day_id,
+                slot_index=slot.slot_index,
+                title=slot.title,
+                project_type=ProjectTypeInfo.model_validate(slot.project_type),
+                start_at=slot.start_at,
+                end_at=slot.end_at,
+                location=slot.location,
+                defense_date=day.date,
+            )
+        )
+    return MyDefenseListResponse(items=items)
+
+
 @defense_router.post("/slots/{slot_id}/register", response_model=DefenseRegistrationFull)
 async def register_for_defense(
     slot_id: int,
@@ -214,4 +245,19 @@ async def register_for_defense(
         raise HTTPException(status_code=400, detail=msg) from e
 
     return DefenseRegistrationFull.model_validate(registration)
+
+
+@defense_router.delete("/slots/{slot_id}/register", status_code=204)
+async def unregister_from_defense(
+    slot_id: int,
+    defense_service: DefenseService = Depends(get_defense_service),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Удалить запись текущего пользователя на защиту в указанном слоте."""
+    try:
+        await defense_service.unregister_user_from_slot(user_id=current_user.id, slot_id=slot_id)
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Registration not found") from e
+        raise HTTPException(status_code=400, detail=str(e)) from e
 

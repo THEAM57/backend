@@ -4,7 +4,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import selectinload
 
 from src.core.uow import IUnitOfWork
@@ -242,6 +242,31 @@ class DefenseRegistrationRepository:
         self.uow.session.add(registration)
         await self.uow.session.flush()
         return registration
+
+    async def delete_by_user_and_slot(self, user_id: int, slot_id: int) -> bool:
+        """Удалить запись пользователя на слот. Возвращает True, если запись была удалена, False если не найдена."""
+        result = await self.uow.session.execute(
+            delete(DefenseRegistration).where(
+                DefenseRegistration.user_id == user_id,
+                DefenseRegistration.slot_id == slot_id,
+            )
+        )
+        return result.rowcount > 0
+
+    async def list_by_user(self, user_id: int) -> list[DefenseRegistration]:
+        """Получить все записи пользователя на защиты, с подгрузкой слота (тип проекта, день), по времени слота."""
+        query = (
+            select(DefenseRegistration)
+            .join(DefenseSlot, DefenseRegistration.slot_id == DefenseSlot.id)
+            .where(DefenseRegistration.user_id == user_id)
+            .order_by(DefenseSlot.start_at)
+            .options(
+                selectinload(DefenseRegistration.slot).selectinload(DefenseSlot.project_type),
+                selectinload(DefenseRegistration.slot).selectinload(DefenseSlot.defense_day),
+            )
+        )
+        result = await self.uow.session.execute(query)
+        return list(result.unique().scalars().all())
 
     async def list_for_slot(self, slot_id: int) -> Sequence[DefenseRegistration]:
         """Получить все записи на конкретный слот (пригодится позже)."""

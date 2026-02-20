@@ -140,6 +140,29 @@ class DefenseRegistrationFull(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MyDefenseItem(BaseModel):
+    """Элемент списка «мои защиты»: запись студента с данными слота."""
+
+    registration_id: int
+    slot_id: int
+    defense_day_id: int
+    slot_index: int
+    title: str
+    project_type: ProjectTypeInfo
+    start_at: datetime
+    end_at: datetime
+    location: str | None = None
+    defense_date: date
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MyDefenseListResponse(BaseModel):
+    """Список защит, на которые записан текущий пользователь."""
+
+    items: list[MyDefenseItem]
+
+
 class DefenseSlotListItem(BaseModel):
     """Элемент списка слотов защит."""
 
