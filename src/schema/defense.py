@@ -165,3 +165,33 @@ class DefenseSlotListResponse(BaseModel):
     limit: int
     total_pages: int
 
+
+# --- Запланированные защиты (слоты с хотя бы одной записью) ---
+
+
+class ScheduledDefenseItem(BaseModel):
+    """Элемент списка запланированных защит: слот, который фактически состоится (есть записи)."""
+
+    id: int
+    defense_day_id: int
+    slot_index: int
+    title: str
+    project_type: ProjectTypeInfo
+    start_at: datetime
+    end_at: datetime
+    location: str | None = None
+    capacity: int
+    registrations_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ScheduledDefenseListResponse(BaseModel):
+    """Список запланированных защит (только слоты с записями) с пагинацией."""
+
+    items: list[ScheduledDefenseItem]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+

@@ -22,6 +22,8 @@ from .defense import (
     ProjectTypeFull,
     ProjectTypeInfo,
     ProjectTypeListResponse,
+    ScheduledDefenseItem,
+    ScheduledDefenseListResponse,
 )
 
 __all__ = [
@@ -65,4 +67,6 @@ __all__ = [
     "ProjectTypeFull",
     "ProjectTypeInfo",
     "ProjectTypeListResponse",
+    "ScheduledDefenseItem",
+    "ScheduledDefenseListResponse",
 ]

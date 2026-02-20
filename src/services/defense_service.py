@@ -119,19 +119,42 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         filter_date: date | None = None,
         filter_project_type_id: int | None = None,
     ) -> tuple[list[DefenseSlot], int]:
-        """Получить слоты защит с пагинацией и фильтрами (по дате и типу проекта)."""
+        """Получить только доступные слоты (без записей) с пагинацией и фильтрами."""
         skip = (page - 1) * limit
         slots = await self._slot_repository.get_filtered(
             skip=skip,
             limit=limit,
             date=filter_date,
             project_type_id=filter_project_type_id,
+            only_available=True,
         )
         total = await self._slot_repository.count_filtered(
             date=filter_date,
             project_type_id=filter_project_type_id,
+            only_available=True,
         )
         return slots, total
+
+    async def get_scheduled_defenses_paginated(
+        self,
+        page: int = 1,
+        limit: int = 10,
+        filter_date: date | None = None,
+        filter_project_type_id: int | None = None,
+    ) -> tuple[list[tuple[DefenseSlot, int]], int]:
+        """Получить запланированные защиты (слоты с хотя бы одной записью) с пагинацией и фильтрами."""
+        skip = (page - 1) * limit
+        rows = await self._slot_repository.get_scheduled_filtered(
+            skip=skip,
+            limit=limit,
+            date=filter_date,
+            project_type_id=filter_project_type_id,
+        )
+        total = await self._slot_repository.count_scheduled_filtered(
+            date=filter_date,
+            project_type_id=filter_project_type_id,
+        )
+        return rows, total
 
     async def register_user_to_slot(self, user_id: int, slot_id: int) -> DefenseRegistration:
         """Записать пользователя на защиту в указанный слот.
@@ -139,7 +162,7 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         Бизнес‑правила:
         - слот должен существовать;
         - пользователь не может записаться дважды в один и тот же слот;
-        - количество записей не должно превышать capacity слота.
+        - в один слот может быть записан только один человек (один слот = одна защита).
         """
         slot = await self._slot_repository.get_by_id(slot_id)
         if not slot:
@@ -150,7 +173,7 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
             raise ValueError("User is already registered for this defense slot")
 
         current_count = await self._registration_repository.count_for_slot(slot_id=slot_id)
-        if current_count >= slot.capacity:
+        if current_count >= 1:
             raise ValueError("Defense slot is full")
 
         return await self._registration_repository.create(slot_id=slot_id, user_id=user_id)

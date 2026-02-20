@@ -4,7 +4,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import selectinload
 
 from src.core.uow import IUnitOfWork
@@ -79,8 +79,9 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
         limit: int = 100,
         date: date_type | None = None,
         project_type_id: int | None = None,
+        only_available: bool = False,
     ) -> list[DefenseSlot]:
-        """Получить слоты с фильтрами по дате и типу проекта."""
+        """Получить слоты с фильтрами. Если only_available=True — только слоты без записей (доступные для записи)."""
         query = select(DefenseSlot).options(selectinload(DefenseSlot.project_type))
 
         if date:
@@ -88,6 +89,10 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
 
         if project_type_id:
             query = query.where(DefenseSlot.project_type_id == project_type_id)
+
+        if only_available:
+            has_any_registration = exists().where(DefenseRegistration.slot_id == DefenseSlot.id)
+            query = query.where(~has_any_registration)
 
         query = query.offset(skip).limit(limit)
         result = await self.uow.session.execute(query)
@@ -97,8 +102,9 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
         self,
         date: date_type | None = None,
         project_type_id: int | None = None,
+        only_available: bool = False,
     ) -> int:
-        """Подсчитать слоты с фильтрами."""
+        """Подсчитать слоты с фильтрами. Если only_available=True — только слоты без записей."""
         query = select(func.count()).select_from(DefenseSlot)
 
         if date:
@@ -107,6 +113,53 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
         if project_type_id:
             query = query.where(DefenseSlot.project_type_id == project_type_id)
 
+        if only_available:
+            has_any_registration = exists().where(DefenseRegistration.slot_id == DefenseSlot.id)
+            query = query.where(~has_any_registration)
+
+        result = await self.uow.session.execute(query)
+        return result.scalar_one()
+
+    async def get_scheduled_filtered(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        date: date_type | None = None,
+        project_type_id: int | None = None,
+    ) -> list[tuple[DefenseSlot, int]]:
+        """Получить слоты, на которые есть хотя бы одна запись (фактические защиты), с количеством записей."""
+        has_reg = exists().where(DefenseRegistration.slot_id == DefenseSlot.id)
+        reg_count = (
+            select(func.count(DefenseRegistration.id))
+            .where(DefenseRegistration.slot_id == DefenseSlot.id)
+            .correlate(DefenseSlot)
+            .scalar_subquery()
+        )
+        query = (
+            select(DefenseSlot, reg_count.label("registrations_count"))
+            .options(selectinload(DefenseSlot.project_type))
+            .where(has_reg)
+        )
+        if date:
+            query = query.where(func.date(DefenseSlot.start_at) == date)
+        if project_type_id:
+            query = query.where(DefenseSlot.project_type_id == project_type_id)
+        query = query.offset(skip).limit(limit)
+        result = await self.uow.session.execute(query)
+        return [(row[0], int(row[1])) for row in result.all()]
+
+    async def count_scheduled_filtered(
+        self,
+        date: date_type | None = None,
+        project_type_id: int | None = None,
+    ) -> int:
+        """Подсчитать слоты с хотя бы одной записью (запланированные защиты)."""
+        has_reg = exists().where(DefenseRegistration.slot_id == DefenseSlot.id)
+        query = select(func.count()).select_from(DefenseSlot).where(has_reg)
+        if date:
+            query = query.where(func.date(DefenseSlot.start_at) == date)
+        if project_type_id:
+            query = query.where(DefenseSlot.project_type_id == project_type_id)
         result = await self.uow.session.execute(query)
         return result.scalar_one()
 

@@ -21,6 +21,8 @@ from src.schema.defense import (
     ProjectTypeCreate,
     ProjectTypeFull,
     ProjectTypeListResponse,
+    ScheduledDefenseItem,
+    ScheduledDefenseListResponse,
 )
 from src.services.defense_service import DefenseService
 
@@ -115,7 +117,7 @@ async def list_defense_slots(
     defense_service: DefenseService = Depends(get_defense_service),
     _current_user: User = Depends(get_current_user),
 ) -> DefenseSlotListResponse:
-    """Получить список слотов защит с пагинацией и фильтрами."""
+    """Получить список доступных слотов защит (слоты, на которые ещё никто не записан)."""
     slots, total = await defense_service.get_slots_paginated(
         page=page,
         limit=limit,
@@ -127,6 +129,36 @@ async def list_defense_slots(
     total_pages = (total + limit - 1) // limit if total > 0 else 0
 
     return DefenseSlotListResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=total_pages,
+    )
+
+
+@defense_router.get("/scheduled", response_model=ScheduledDefenseListResponse)
+async def list_scheduled_defenses(
+    page: int = Query(1, ge=1, description="Номер страницы"),
+    limit: int = Query(10, ge=1, le=100, description="Количество на странице"),
+    date: date | None = Query(None, description="Фильтр по дате (YYYY-MM-DD)"),
+    project_type_id: int | None = Query(None, description="Фильтр по ID типа проекта"),
+    defense_service: DefenseService = Depends(get_defense_service),
+    _current_user: User = Depends(get_current_user),
+) -> ScheduledDefenseListResponse:
+    """Получить список запланированных защит."""
+    rows, total = await defense_service.get_scheduled_defenses_paginated(
+        page=page,
+        limit=limit,
+        filter_date=date,
+        filter_project_type_id=project_type_id,
+    )
+    items = []
+    for slot, registrations_count in rows:
+        setattr(slot, "registrations_count", registrations_count)
+        items.append(ScheduledDefenseItem.model_validate(slot))
+    total_pages = (total + limit - 1) // limit if total > 0 else 0
+    return ScheduledDefenseListResponse(
         items=items,
         total=total,
         page=page,
