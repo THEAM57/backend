@@ -97,7 +97,6 @@ class DefenseSlotCreate(BaseModel):
     title: str
     project_type_id: int
     location: str | None = None
-    capacity: int
 
 
 class DefenseSlotBase(BaseModel):
@@ -108,7 +107,7 @@ class DefenseSlotBase(BaseModel):
     start_at: datetime
     end_at: datetime
     location: str | None = None
-    capacity: int
+    is_available: bool  # True если на слот ещё никто не записался
 
 
 class DefenseSlotFull(DefenseSlotBase):
@@ -127,6 +126,7 @@ class DefenseRegistrationCreate(BaseModel):
     """Схема для записи пользователя на защиту."""
 
     slot_id: int
+    project_id: int | None = None  # ID проекта для оценивания на защите
 
 
 class DefenseRegistrationFull(BaseModel):
@@ -135,6 +135,7 @@ class DefenseRegistrationFull(BaseModel):
     id: int
     slot_id: int
     user_id: int
+    project_id: int | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -164,7 +165,7 @@ class MyDefenseListResponse(BaseModel):
 
 
 class DefenseSlotListItem(BaseModel):
-    """Элемент списка слотов защит."""
+    """Элемент списка слотов защит (только доступные — is_available всегда True)."""
 
     id: int
     defense_day_id: int
@@ -174,7 +175,7 @@ class DefenseSlotListItem(BaseModel):
     start_at: datetime
     end_at: datetime
     location: str | None = None
-    capacity: int
+    is_available: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -193,7 +194,7 @@ class DefenseSlotListResponse(BaseModel):
 
 
 class ScheduledDefenseItem(BaseModel):
-    """Элемент списка запланированных защит: слот, который фактически состоится (есть записи)."""
+    """Элемент списка запланированных защит: слот, на который уже кто-то записался."""
 
     id: int
     defense_day_id: int
@@ -203,8 +204,9 @@ class ScheduledDefenseItem(BaseModel):
     start_at: datetime
     end_at: datetime
     location: str | None = None
-    capacity: int
+    is_available: bool = False  # запланированные слоты заняты
     registrations_count: int
+    project_id: int | None = None  # ID проекта для оценивания (из записи на защиту)
 
     model_config = ConfigDict(from_attributes=True)
 

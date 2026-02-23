@@ -276,8 +276,6 @@ class DefenseSlot(Base):
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
-    capacity: Mapped[int] = mapped_column(Integer, nullable=False)
-
     defense_day: Mapped[DefenseDay] = relationship(back_populates="slots")
     project_type: Mapped[DefenseProjectType] = relationship(back_populates="slots")
     registrations: Mapped[list["DefenseRegistration"]] = relationship(
@@ -304,9 +302,11 @@ class DefenseRegistration(Base):
 
     slot_id: Mapped[int] = mapped_column(ForeignKey("defense_slot.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id"), nullable=True)
 
     slot: Mapped[DefenseSlot] = relationship(back_populates="registrations")
     user: Mapped[User] = relationship()
+    project: Mapped[Project | None] = relationship()
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

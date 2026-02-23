@@ -126,8 +126,8 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
         limit: int = 100,
         date: date_type | None = None,
         project_type_id: int | None = None,
-    ) -> list[tuple[DefenseSlot, int]]:
-        """Получить слоты, на которые есть хотя бы одна запись (фактические защиты), с количеством записей."""
+    ) -> list[tuple[DefenseSlot, int, int | None]]:
+        """Получить слоты с хотя бы одной записью (фактические защиты), с количеством записей и project_id для оценивания."""
         has_reg = exists().where(DefenseRegistration.slot_id == DefenseSlot.id)
         reg_count = (
             select(func.count(DefenseRegistration.id))
@@ -135,8 +135,19 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
             .correlate(DefenseSlot)
             .scalar_subquery()
         )
+        project_id_subq = (
+            select(DefenseRegistration.project_id)
+            .where(DefenseRegistration.slot_id == DefenseSlot.id)
+            .limit(1)
+            .correlate(DefenseSlot)
+            .scalar_subquery()
+        )
         query = (
-            select(DefenseSlot, reg_count.label("registrations_count"))
+            select(
+                DefenseSlot,
+                reg_count.label("registrations_count"),
+                project_id_subq.label("project_id"),
+            )
             .options(selectinload(DefenseSlot.project_type))
             .where(has_reg)
         )
@@ -146,7 +157,7 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
             query = query.where(DefenseSlot.project_type_id == project_type_id)
         query = query.offset(skip).limit(limit)
         result = await self.uow.session.execute(query)
-        return [(row[0], int(row[1])) for row in result.all()]
+        return [(row[0], int(row[1]), row[2]) for row in result.all()]
 
     async def count_scheduled_filtered(
         self,
@@ -190,7 +201,6 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
         title: str,
         project_type_id: int,
         location: str | None,
-        capacity: int,
     ) -> DefenseSlot:
         """Создать слот с вычисленным временем (30 мин)."""
         slot = DefenseSlot(
@@ -201,7 +211,6 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
             title=title,
             project_type_id=project_type_id,
             location=location,
-            capacity=capacity,
         )
         self.uow.session.add(slot)
         await self.uow.session.flush()
@@ -236,9 +245,13 @@ class DefenseRegistrationRepository:
         )
         return result.scalars().first()
 
-    async def create(self, slot_id: int, user_id: int) -> DefenseRegistration:
-        """Создать новую запись на защиту."""
-        registration = DefenseRegistration(slot_id=slot_id, user_id=user_id)
+    async def create(
+        self, slot_id: int, user_id: int, project_id: int | None = None
+    ) -> DefenseRegistration:
+        """Создать новую запись на защиту (project_id — для оценивания)."""
+        registration = DefenseRegistration(
+            slot_id=slot_id, user_id=user_id, project_id=project_id
+        )
         self.uow.session.add(registration)
         await self.uow.session.flush()
         return registration

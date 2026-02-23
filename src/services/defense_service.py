@@ -75,6 +75,16 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         """Получить слот защиты по ID."""
         return await self._slot_repository.get_by_id(slot_id)
 
+    async def get_slot_with_availability(
+        self, slot_id: int
+    ) -> tuple[DefenseSlot | None, bool]:
+        """Получить слот по ID и флаг is_available (True если на слот никто не записан)."""
+        slot = await self._slot_repository.get_by_id(slot_id)
+        if not slot:
+            return None, False
+        count = await self._registration_repository.count_for_slot(slot_id=slot_id)
+        return slot, count == 0
+
     async def create_slot(self, slot_data: DefenseSlotCreate) -> DefenseSlot:
         """Создать слот по дню и номеру; время вычисляется (30 мин)."""
         # Проверка типа проекта
@@ -109,7 +119,6 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
             title=slot_data.title,
             project_type_id=slot_data.project_type_id,
             location=slot_data.location,
-            capacity=slot_data.capacity,
         )
 
     async def get_slots_paginated(
@@ -141,8 +150,8 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         limit: int = 10,
         filter_date: date | None = None,
         filter_project_type_id: int | None = None,
-    ) -> tuple[list[tuple[DefenseSlot, int]], int]:
-        """Получить запланированные защиты (слоты с хотя бы одной записью) с пагинацией и фильтрами."""
+    ) -> tuple[list[tuple[DefenseSlot, int, int | None]], int]:
+        """Получить запланированные защиты (слоты с хотя бы одной записью) с пагинацией и фильтрами; project_id для оценивания."""
         skip = (page - 1) * limit
         rows = await self._slot_repository.get_scheduled_filtered(
             skip=skip,
@@ -156,13 +165,16 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         )
         return rows, total
 
-    async def register_user_to_slot(self, user_id: int, slot_id: int) -> DefenseRegistration:
+    async def register_user_to_slot(
+        self, user_id: int, slot_id: int, project_id: int | None = None
+    ) -> DefenseRegistration:
         """Записать пользователя на защиту в указанный слот.
 
         Бизнес‑правила:
         - слот должен существовать;
         - пользователь не может записаться дважды в один и тот же слот;
         - в один слот может быть записан только один человек (один слот = одна защита).
+        project_id — ID проекта для оценивания на защите (опционально).
         """
         slot = await self._slot_repository.get_by_id(slot_id)
         if not slot:
@@ -176,7 +188,9 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         if current_count >= 1:
             raise ValueError("Defense slot is full")
 
-        return await self._registration_repository.create(slot_id=slot_id, user_id=user_id)
+        return await self._registration_repository.create(
+            slot_id=slot_id, user_id=user_id, project_id=project_id
+        )
 
     async def get_my_registrations(self, user_id: int) -> list[DefenseRegistration]:
         """Получить список записей пользователя на защиты (слоты с датой и типом проекта), по времени."""

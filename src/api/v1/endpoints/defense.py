@@ -127,6 +127,8 @@ async def list_defense_slots(
         filter_date=date,
         filter_project_type_id=project_type_id,
     )
+    for slot in slots:
+        setattr(slot, "is_available", True)  # в этом списке только свободные слоты
     items = [DefenseSlotListItem.model_validate(slot) for slot in slots]
 
     total_pages = (total + limit - 1) // limit if total > 0 else 0
@@ -157,8 +159,10 @@ async def list_scheduled_defenses(
         filter_project_type_id=project_type_id,
     )
     items = []
-    for slot, registrations_count in rows:
+    for slot, registrations_count, project_id in rows:
         setattr(slot, "registrations_count", registrations_count)
+        setattr(slot, "project_id", project_id)
+        setattr(slot, "is_available", False)  # запланированные слоты заняты
         items.append(ScheduledDefenseItem.model_validate(slot))
     total_pages = (total + limit - 1) // limit if total > 0 else 0
     return ScheduledDefenseListResponse(
@@ -176,10 +180,11 @@ async def get_defense_slot(
     defense_service: DefenseService = Depends(get_defense_service),
     _current_user: User = Depends(get_current_user),
 ) -> DefenseSlotFull:
-    """Получить слот защиты по ID."""
-    slot = await defense_service.get_slot_by_id(slot_id)
+    """Получить слот защиты по ID (is_available — свободен ли слот)."""
+    slot, is_available = await defense_service.get_slot_with_availability(slot_id)
     if not slot:
         raise HTTPException(status_code=404, detail="Defense slot not found")
+    setattr(slot, "is_available", is_available)
     return DefenseSlotFull.model_validate(slot)
 
 
@@ -197,6 +202,7 @@ async def create_defense_slot(
         if "day not found" in msg or "Defense day not found" in msg or "Project type not found" in msg:
             raise HTTPException(status_code=404, detail=msg) from e
         raise HTTPException(status_code=400, detail=msg) from e
+    setattr(slot, "is_available", True)  # новый слот свободен
     return DefenseSlotFull.model_validate(slot)
 
 
@@ -231,13 +237,17 @@ async def list_my_defenses(
 @defense_router.post("/slots/{slot_id}/register", response_model=DefenseRegistrationFull)
 async def register_for_defense(
     slot_id: int,
-    _body: DefenseRegistrationCreate,
+    body: DefenseRegistrationCreate,
     defense_service: DefenseService = Depends(get_defense_service),
     current_user: User = Depends(get_current_user),
 ) -> DefenseRegistrationFull:
-    """Записать текущего пользователя на защиту в указанный слот."""
+    """Записать текущего пользователя на защиту в указанный слот (можно передать project_id для оценивания)."""
     try:
-        registration = await defense_service.register_user_to_slot(user_id=current_user.id, slot_id=slot_id)
+        registration = await defense_service.register_user_to_slot(
+            user_id=current_user.id,
+            slot_id=slot_id,
+            project_id=body.project_id,
+        )
     except ValueError as e:
         msg = str(e)
         if "not found" in msg:
