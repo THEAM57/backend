@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
-from enum import Enum
+from datetime import date, datetime, time
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, String, Time, func
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Time, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -227,7 +226,7 @@ class DefenseProjectType(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
-    slots: Mapped[list["DefenseSlot"]] = relationship(back_populates="project_type")
+    slots: Mapped[list[DefenseSlot]] = relationship(back_populates="project_type")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -244,7 +243,7 @@ class DefenseDay(Base):
     max_slots: Mapped[int] = mapped_column(Integer, nullable=False)
     first_slot_time: Mapped[time] = mapped_column(Time, nullable=False)
 
-    slots: Mapped[list["DefenseSlot"]] = relationship(
+    slots: Mapped[list[DefenseSlot]] = relationship(
         back_populates="defense_day",
         cascade="all, delete-orphan",
     )
@@ -278,7 +277,7 @@ class DefenseSlot(Base):
 
     defense_day: Mapped[DefenseDay] = relationship(back_populates="slots")
     project_type: Mapped[DefenseProjectType] = relationship(back_populates="slots")
-    registrations: Mapped[list["DefenseRegistration"]] = relationship(
+    registrations: Mapped[list[DefenseRegistration]] = relationship(
         back_populates="slot",
         cascade="all, delete-orphan",
     )
@@ -312,3 +311,51 @@ class DefenseRegistration(Base):
 
     def __repr__(self) -> str:
         return f"DefenseRegistration(id={self.id!r}, slot_id={self.slot_id!r}, user_id={self.user_id!r})"
+
+class GradingCriteria(Base):
+    """Критерии оценивания проектов"""
+
+    __tablename__ = "grading_criteria"
+    __table_args__ = (
+        {"comment": "Критерии оценивания для разных типов проектов"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_type_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("project.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="ID типа проекта",
+    )
+    name: Mapped[str] = mapped_column(
+        String(100), nullable=False, comment="Название критерия"
+    )
+    description: Mapped[str | None] = mapped_column(
+        String(200), nullable=True, comment="Описание критерия"
+    )
+    max_score: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="Максимальный балл (1-100)"
+    )
+    weight: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, comment="Вес критерия (1-5)"
+    )
+    order_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="Порядок отображения"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    def __repr__(self):
+        return (
+            f"GradingCriteria(id={self.id!r}, name={self.name!r}, "
+            f"max_score={self.max_score!r}, weight={self.weight!r})"
+        )
+

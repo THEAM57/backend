@@ -12,7 +12,7 @@ class EvaluationBase(BaseModel):
     participant_id: int
     scores: dict[str, int] = Field(
         default_factory=dict,
-        description="Оценки по критериям в формате {\"criterion_key\": score}",
+        description='Оценки по критериям в формате {"criterion_key": score}',
     )
     comment: str | None = None
 
@@ -56,4 +56,3 @@ class EvaluationResultsResponse(BaseModel):
     """Сводные результаты оценивания по проекту (форма представления результатов)."""
 
     items: list[EvaluationResultItem]
-

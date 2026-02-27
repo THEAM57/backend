@@ -8,7 +8,6 @@ from src.model.models import Evaluation
 from src.repository.project_repository import ProjectRepository
 from src.schema.evaluation import (
     EvaluationCreate,
-    EvaluationFull,
     EvaluationResultItem,
     EvaluationResultsResponse,
     EvaluationUpdate,
@@ -82,4 +81,3 @@ class EvaluationService(BaseService[Evaluation, EvaluationCreate, EvaluationUpda
             )
 
         return EvaluationResultsResponse(items=items)
-

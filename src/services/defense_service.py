@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from src.model.models import DefenseDay, DefenseProjectType, DefenseRegistration, DefenseSlot
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def _slot_start_end(day: DefenseDay, slot_index: int) -> tuple[datetime, datetime]:
     """Вычислить start_at и end_at для слота (30 мин)."""
     start_naive = datetime.combine(day.date, day.first_slot_time)
-    start_naive = start_naive.replace(tzinfo=timezone.utc)
+    start_naive = start_naive.replace(tzinfo=UTC)
     start_at = start_naive + timedelta(minutes=slot_index * 30)
     end_at = start_at + timedelta(minutes=30)
     return start_at, end_at
@@ -30,10 +30,10 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
 
     def __init__(
         self,
-        project_type_repository: "DefenseProjectTypeRepository",
-        day_repository: "DefenseDayRepository",
-        slot_repository: "DefenseSlotRepository",
-        registration_repository: "DefenseRegistrationRepository",
+        project_type_repository: DefenseProjectTypeRepository,
+        day_repository: DefenseDayRepository,
+        slot_repository: DefenseSlotRepository,
+        registration_repository: DefenseRegistrationRepository,
     ):
         super().__init__(slot_repository)
         self._project_type_repository = project_type_repository
@@ -75,9 +75,7 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         """Получить слот защиты по ID."""
         return await self._slot_repository.get_by_id(slot_id)
 
-    async def get_slot_with_availability(
-        self, slot_id: int
-    ) -> tuple[DefenseSlot | None, bool]:
+    async def get_slot_with_availability(self, slot_id: int) -> tuple[DefenseSlot | None, bool]:
         """Получить слот по ID и флаг is_available (True если на слот никто не записан)."""
         slot = await self._slot_repository.get_by_id(slot_id)
         if not slot:
@@ -97,17 +95,13 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
             raise ValueError("Defense day not found")
 
         if slot_data.slot_index < 0 or slot_data.slot_index >= day.max_slots:
-            raise ValueError(
-                f"slot_index must be in [0, {day.max_slots - 1}], got {slot_data.slot_index}"
-            )
+            raise ValueError(f"slot_index must be in [0, {day.max_slots - 1}], got {slot_data.slot_index}")
 
         existing = await self._slot_repository.get_by_day_and_index(
             defense_day_id=day.id, slot_index=slot_data.slot_index
         )
         if existing:
-            raise ValueError(
-                f"Slot with index {slot_data.slot_index} already exists for this day"
-            )
+            raise ValueError(f"Slot with index {slot_data.slot_index} already exists for this day")
 
         start_at, end_at = _slot_start_end(day, slot_data.slot_index)
 
@@ -188,9 +182,7 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         if current_count >= 1:
             raise ValueError("Defense slot is full")
 
-        return await self._registration_repository.create(
-            slot_id=slot_id, user_id=user_id, project_id=project_id
-        )
+        return await self._registration_repository.create(slot_id=slot_id, user_id=user_id, project_id=project_id)
 
     async def get_my_registrations(self, user_id: int) -> list[DefenseRegistration]:
         """Получить список записей пользователя на защиты (слоты с датой и типом проекта), по времени."""
@@ -202,9 +194,6 @@ class DefenseService(BaseService[DefenseSlot, DefenseSlotCreate, DefenseSlotCrea
         Raises:
             ValueError: если запись не найдена (пользователь не был записан на этот слот).
         """
-        deleted = await self._registration_repository.delete_by_user_and_slot(
-            user_id=user_id, slot_id=slot_id
-        )
+        deleted = await self._registration_repository.delete_by_user_and_slot(user_id=user_id, slot_id=slot_id)
         if not deleted:
             raise ValueError("Registration not found")
-

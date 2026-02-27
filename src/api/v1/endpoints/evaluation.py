@@ -25,7 +25,7 @@ async def create_evaluation(
         evaluation = await evaluation_service.create_evaluation(evaluation_data, current_user.id)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e.detail)) from e
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to create evaluation: {e!s}",
@@ -44,4 +44,3 @@ async def get_project_results(
 
     results = await evaluation_service.get_results_for_project(project_id)
     return results
-
