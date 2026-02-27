@@ -4,7 +4,6 @@ from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict
 
-
 # --- DefenseProjectType ---
 
 
@@ -219,4 +218,3 @@ class ScheduledDefenseListResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
-

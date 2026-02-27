@@ -31,4 +31,3 @@ class EvaluationRepository(BaseRepository[Evaluation, EvaluationCreate, Evaluati
             )
         )
         return list(result.scalars().all())
-

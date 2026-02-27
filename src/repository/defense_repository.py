@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date as date_type
 from datetime import datetime
-from typing import Sequence
 
 from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import selectinload
@@ -22,16 +22,12 @@ class DefenseProjectTypeRepository(BaseRepository[DefenseProjectType, ProjectTyp
 
     async def get_by_name(self, name: str) -> DefenseProjectType | None:
         """Получить тип проекта по имени."""
-        result = await self.uow.session.execute(
-            select(DefenseProjectType).where(DefenseProjectType.name == name)
-        )
+        result = await self.uow.session.execute(select(DefenseProjectType).where(DefenseProjectType.name == name))
         return result.scalars().first()
 
     async def get_all(self) -> list[DefenseProjectType]:
         """Получить все типы проектов."""
-        result = await self.uow.session.execute(
-            select(DefenseProjectType).order_by(DefenseProjectType.name)
-        )
+        result = await self.uow.session.execute(select(DefenseProjectType).order_by(DefenseProjectType.name))
         return list(result.scalars().all())
 
 
@@ -57,19 +53,14 @@ class DefenseSlotRepository(BaseRepository[DefenseSlot, DefenseSlotCreate, Defen
     async def get_by_id(self, slot_id: int) -> DefenseSlot | None:
         """Получить слот по ID с загрузкой связанного типа проекта."""
         result = await self.uow.session.execute(
-            select(DefenseSlot)
-            .options(selectinload(DefenseSlot.project_type))
-            .where(DefenseSlot.id == slot_id)
+            select(DefenseSlot).options(selectinload(DefenseSlot.project_type)).where(DefenseSlot.id == slot_id)
         )
         return result.scalars().first()
 
     async def get_paginated(self, skip: int = 0, limit: int = 10) -> list[DefenseSlot]:
         """Получить список слотов с пагинацией."""
         result = await self.uow.session.execute(
-            select(DefenseSlot)
-            .options(selectinload(DefenseSlot.project_type))
-            .offset(skip)
-            .limit(limit)
+            select(DefenseSlot).options(selectinload(DefenseSlot.project_type)).offset(skip).limit(limit)
         )
         return list(result.scalars().all())
 
@@ -245,13 +236,9 @@ class DefenseRegistrationRepository:
         )
         return result.scalars().first()
 
-    async def create(
-        self, slot_id: int, user_id: int, project_id: int | None = None
-    ) -> DefenseRegistration:
+    async def create(self, slot_id: int, user_id: int, project_id: int | None = None) -> DefenseRegistration:
         """Создать новую запись на защиту (project_id — для оценивания)."""
-        registration = DefenseRegistration(
-            slot_id=slot_id, user_id=user_id, project_id=project_id
-        )
+        registration = DefenseRegistration(slot_id=slot_id, user_id=user_id, project_id=project_id)
         self.uow.session.add(registration)
         await self.uow.session.flush()
         return registration
@@ -287,4 +274,3 @@ class DefenseRegistrationRepository:
             select(DefenseRegistration).where(DefenseRegistration.slot_id == slot_id)
         )
         return result.scalars().all()
-

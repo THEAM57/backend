@@ -2,6 +2,7 @@
 """Скрипт для заполнения тестовыми данными: преподаватель, студент, проект, участие.
 Запуск из корня проекта: python scripts/seed_test_data.py
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -12,11 +13,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from pwdlib import PasswordHash
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import AsyncSessionLocal, engine
 from src.model.models import Project, ProjectParticipation, User
-
 
 # Пароль для обоих тестовых пользователей (для входа в Swagger)
 TEST_PASSWORD = "test1234"

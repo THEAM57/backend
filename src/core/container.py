@@ -6,25 +6,27 @@ from fastapi import Depends
 
 from src.core.uow import IUnitOfWork, SqlAlchemyUoW
 from src.repository.audit_repository import AuditRepository
-from src.repository.evaluation_repository import EvaluationRepository
-from src.repository.project_repository import ProjectRepository
-from src.repository.resume_repository import ResumeRepository
-from src.repository.session_repository import SessionRepository
-from src.repository.user_repository import UserRepository
 from src.repository.defense_repository import (
     DefenseDayRepository,
     DefenseProjectTypeRepository,
     DefenseRegistrationRepository,
     DefenseSlotRepository,
 )
+from src.repository.evaluation_repository import EvaluationRepository
+from src.repository.grading_criteria_repository import GradingCriteriaRepository
+from src.repository.project_repository import ProjectRepository
+from src.repository.resume_repository import ResumeRepository
+from src.repository.session_repository import SessionRepository
+from src.repository.user_repository import UserRepository
 from src.services.audit_service import AuditService
 from src.services.auth_service import AuthService
+from src.services.defense_service import DefenseService
 from src.services.evaluation_service import EvaluationService
+from src.services.grading_criteria_service import GradingCriteriaService
 from src.services.project_service import ProjectService
 from src.services.resume_service import ResumeService
 from src.services.session_service import SessionService
 from src.services.user_service import UserService
-from src.services.defense_service import DefenseService
 
 
 async def get_uow() -> AsyncGenerator[IUnitOfWork, None]:
@@ -56,6 +58,7 @@ async def get_audit_repository(uow: IUnitOfWork = Depends(get_uow)) -> AuditRepo
 async def get_evaluation_repository(uow: IUnitOfWork = Depends(get_uow)) -> EvaluationRepository:
     return EvaluationRepository(uow)
 
+
 async def get_defense_project_type_repository(uow: IUnitOfWork = Depends(get_uow)) -> DefenseProjectTypeRepository:
     return DefenseProjectTypeRepository(uow)
 
@@ -70,6 +73,10 @@ async def get_defense_slot_repository(uow: IUnitOfWork = Depends(get_uow)) -> De
 
 async def get_defense_registration_repository(uow: IUnitOfWork = Depends(get_uow)) -> DefenseRegistrationRepository:
     return DefenseRegistrationRepository(uow)
+
+
+async def get_grading_criteria_repository(uow: IUnitOfWork = Depends(get_uow)) -> GradingCriteriaRepository:
+    return GradingCriteriaRepository(uow)
 
 
 # Service
@@ -115,6 +122,7 @@ async def get_evaluation_service(
 ) -> EvaluationService:
     return EvaluationService(evaluation_repository, project_repository)
 
+
 async def get_defense_service(
     project_type_repository: DefenseProjectTypeRepository = Depends(get_defense_project_type_repository),
     day_repository: DefenseDayRepository = Depends(get_defense_day_repository),
@@ -122,3 +130,9 @@ async def get_defense_service(
     registration_repository: DefenseRegistrationRepository = Depends(get_defense_registration_repository),
 ) -> DefenseService:
     return DefenseService(project_type_repository, day_repository, slot_repository, registration_repository)
+
+
+async def get_grading_criteria_service(
+    repository: GradingCriteriaRepository = Depends(get_grading_criteria_repository),
+) -> GradingCriteriaService:
+    return GradingCriteriaService(repository)
